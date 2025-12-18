@@ -369,12 +369,12 @@ drawio.yourdomain.com {
 #### 1. 应用骨架搭建
 
 **后端 (FastAPI)**
-- `backend/app/main.py` - FastAPI 入口，配置 CORS
+- `backend/app/main.py` - FastAPI 入口，配置 CORS，自动加载根目录 `.env`
 - `backend/app/routers/session.py` - 会话管理 API
 - `backend/app/routers/chat.py` - GLM 对话 API（流式响应）
 - `backend/app/routers/diagram.py` - 图表操作 API
 - `backend/app/services/session_manager.py` - 会话管理器
-- `backend/app/services/glm_service.py` - GLM 服务封装
+- `backend/app/services/glm_service.py` - GLM 服务封装（OpenAI 兼容接口）
 - `backend/app/services/mcp_client.py` - MCP 客户端封装
 - `backend/app/models/schemas.py` - Pydantic 数据模型
 - `backend/requirements.txt` - Python 依赖
@@ -390,14 +390,15 @@ drawio.yourdomain.com {
 **部署配置**
 - `docker-compose.yml` - 容器编排
 - `Caddyfile` - 反向代理配置
+- `.env` / `.env.example` - 环境变量配置（统一放在根目录）
 
 #### 2. API Key 验证
 
 - ✅ 创建测试脚本 `backend/tests/test_glm_api.py`
 - ✅ 配置智谱 Coding API（OpenAI 兼容模式）
   - Base URL: `https://open.bigmodel.cn/api/coding/paas/v4`
-  - 模型: `GLM-4.6`
-  - **注意**：GLM Coding 套餐不同于通用 API，专门用于编程需求。
+  - 模型: `codegeex-4`
+  - **注意**：GLM Coding 套餐使用 OpenAI 兼容接口，专门用于编程需求。
 - ✅ 解决 SSL 验证问题（适配 Whistle 代理）
 - ✅ API 连接测试通过
 - ✅ 图表 XML 生成测试通过
@@ -409,25 +410,52 @@ drawio.yourdomain.com {
   - 同时启动前后端服务
   - 支持 Ctrl+C 优雅停止
 
+#### 4. MCP Server 集成（2024-12-18）
+
+- ✅ 更新 MCP Server 配置为 `@next-ai-drawio/mcp-server@latest`
+- ✅ MCP 客户端测试全部通过（6/6）
+  - 连接测试 ✓
+  - 启动会话测试 ✓
+  - 显示图表测试 ✓
+  - 获取图表测试 ✓
+  - 编辑图表测试 ✓
+  - 导出图表测试 ✓
+
+#### 5. GLM Prompt 优化（2024-12-18）
+
+- ✅ 重新设计系统提示词，支持对话 + 绘图双重能力
+- ✅ 添加意图识别机制，区分闲聊和画图需求
+- ✅ 丰富图表生成模板和样式示例
+- ✅ 优化交互引导，提升用户体验
+
+#### 6. 前后端联调（2024-12-18）
+
+- ✅ 统一环境配置到根目录 `.env`
+- ✅ 修复 Home.vue 重复打开预览窗口问题
+- ✅ 修复 ChatMessage 对象属性访问错误
+- ✅ 修复 httpx 代理干扰问题（禁用代理设置）
+- ✅ 端口配置调整：后端 8005，前端 3005
+- ✅ 简单绘图功能测试通过
+
 ---
 
 ### 📋 后续规划
 
-#### 阶段一：本地开发环境完善 (P0)
+#### 阶段一：本地开发环境完善 (P0) ✅ 已完成
 
 | 任务 | 说明 | 状态 |
 |-----|------|------|
-| 后端服务调试 | 启动 FastAPI，验证各接口 | 待开始 |
-| 前端服务调试 | 启动 Vite，验证页面渲染 | 待开始 |
-| 前后端联调 | 测试完整用户流程 | 待开始 |
+| 后端服务调试 | 启动 FastAPI，验证各接口 | ✅ 完成 |
+| 前端服务调试 | 启动 Vite，验证页面渲染 | ✅ 完成 |
+| 前后端联调 | 测试完整用户流程 | ✅ 完成 |
 
-#### 阶段二：核心功能实现 (P0)
+#### 阶段二：核心功能实现 (P0) ✅ 基本完成
 
 | 任务 | 说明 | 状态 |
 |-----|------|------|
-| MCP 客户端通信 | 实现与 drawio MCP Server 的真实通信 | 待开始 |
-| GLM Prompt 优化 | 设计高质量的图表生成提示词 | 待开始 |
-| 图表预览集成 | 将 MCP Server 预览页面集成到前端 | 待开始 |
+| MCP 客户端通信 | 实现与 drawio MCP Server 的真实通信 | ✅ 完成 |
+| GLM Prompt 优化 | 设计高质量的图表生成提示词 | ✅ 完成 |
+| 图表预览集成 | 将 MCP Server 预览页面集成到前端 | ✅ 完成 |
 | 下载功能 | 实现 .drawio 文件导出下载 | 待开始 |
 
 #### 阶段三：部署上线 (P1)
@@ -452,7 +480,7 @@ drawio.yourdomain.com {
 
 ### 🚀 下一步建议
 
-**立即可执行：**
+**当前可用：**
 
 ```bash
 # 1. 启动应用
@@ -464,6 +492,6 @@ drawio.yourdomain.com {
 ```
 
 **优先处理：**
-1. 验证前后端服务能否正常启动
-2. 测试创建会话 → 对话 → 查看图表的完整流程
-3. 根据实际调试情况完善 MCP 客户端通信逻辑
+1. 实现下载功能，完成核心功能闭环
+2. 继续优化 GLM Prompt，提升图表生成质量
+3. 准备 Docker 部署配置
