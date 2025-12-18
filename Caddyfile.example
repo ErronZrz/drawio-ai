@@ -1,0 +1,41 @@
+# DrawIO AI 服务
+# 子域名: drawio.yourdomain.com (请替换为你的实际域名)
+
+drawio.yourdomain.com {
+    # 前端页面
+    handle {
+        reverse_proxy frontend:3005
+    }
+
+    # 后端 API
+    handle /api/* {
+        reverse_proxy backend:8005
+    }
+
+    # 健康检查
+    handle /health {
+        reverse_proxy backend:8005
+    }
+
+    # WebSocket 支持（如需实时通信）
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    handle @websockets {
+        reverse_proxy backend:8005
+    }
+
+    # 安全头
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # 日志
+    log {
+        output file /var/log/caddy/drawio-ai.log
+        format json
+    }
+}

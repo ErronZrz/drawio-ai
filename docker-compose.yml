@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build: ./backend
+    container_name: drawio-ai-backend
+    ports:
+- "8005:8005"
+    environment:
+      - GLM_API_KEY=${GLM_API_KEY}
+      - GLM_MODEL=${GLM_MODEL:-glm-4}
+      - MCP_SERVER_URL=http://drawio-mcp:6002
+      - PREVIEW_BASE_URL=${PREVIEW_BASE_URL:-http://localhost:6002}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - drawio-network
+
+  # 前端服务
+  frontend:
+    build: ./frontend
+    container_name: drawio-ai-frontend
+    ports:
+      - "3005:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - drawio-network
+
+  # Redis 缓存（可选，用于生产环境会话持久化）
+  redis:
+    image: redis:7-alpine
+    container_name: drawio-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - drawio-network
+
+networks:
+  drawio-network:
+    driver: bridge
+
+volumes:
+  redis-data:
