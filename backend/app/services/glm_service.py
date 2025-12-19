@@ -64,19 +64,21 @@ SYSTEM_PROMPT = """# 角色设定
 
 ## 2. 修改现有图表
 
-当用户需要修改当前图表时，使用 `edit` 动作：
+当用户需要修改当前图表时，使用 `edit` 动作。**注意：`new_xml` 是 JSON 字符串，内部的双引号必须转义为 `\"`**
 
 ```json
 {
   "action": "edit",
   "operations": [
-    {"type": "add", "cell_id": "新元素的唯一ID", "new_xml": "<mxCell .../>"},
-    {"type": "update", "cell_id": "要更新的元素ID", "new_xml": "<mxCell .../>"},
-    {"type": "delete", "cell_id": "要删除的元素ID"}
+    {"type": "add", "cell_id": "newNode", "new_xml": "<mxCell id=\"newNode\" value=\"新节点\" style=\"rounded=1;\" vertex=\"1\" parent=\"1\"><mxGeometry height=\"60\" width=\"120\" x=\"100\" y=\"100\" as=\"geometry\"/></mxCell>"},
+    {"type": "update", "cell_id": "existingId", "new_xml": "<mxCell id=\"existingId\" value=\"更新后的文本\" style=\"rounded=1;\" vertex=\"1\" parent=\"1\"><mxGeometry height=\"60\" width=\"120\" x=\"100\" y=\"200\" as=\"geometry\"/></mxCell>"},
+    {"type": "delete", "cell_id": "toDeleteId"}
   ],
   "reply": "你的自然语言回复，解释你做了哪些修改"
 }
 ```
+
+**⚠️ 关键**：上面示例中的 `\"` 是必须的！如果写成 `"` 不转义，整个 JSON 会解析失败。
 
 ## 3. 纯对话回复
 
@@ -110,63 +112,63 @@ SYSTEM_PROMPT = """# 角色设定
 ### 矩形（基础节点）
 ```xml
 <mxCell id="node1" value="节点文本" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/>
+  <mxGeometry height="60" width="120" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 圆角矩形
 ```xml
 <mxCell id="node2" value="圆角节点" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/>
+  <mxGeometry height="60" width="120" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 椭圆（开始/结束）
 ```xml
 <mxCell id="start" value="开始" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-  <mxGeometry x="100" y="40" width="80" height="40" as="geometry"/>
+  <mxGeometry height="40" width="80" x="100" y="40" as="geometry"/>
 </mxCell>
 ```
 
 ### 菱形（判断/决策）
 ```xml
 <mxCell id="decision1" value="条件判断?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-  <mxGeometry x="100" y="150" width="100" height="80" as="geometry"/>
+  <mxGeometry height="80" width="100" x="100" y="150" as="geometry"/>
 </mxCell>
 ```
 
 ### 平行四边形（输入/输出）
 ```xml
 <mxCell id="io1" value="输入数据" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/>
+  <mxGeometry height="60" width="120" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 圆柱体（数据库）
 ```xml
 <mxCell id="db1" value="数据库" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="80" height="100" as="geometry"/>
+  <mxGeometry height="100" width="80" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 文档形状
 ```xml
 <mxCell id="doc1" value="文档" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="100" height="80" as="geometry"/>
+  <mxGeometry height="80" width="100" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 云（外部系统）
 ```xml
 <mxCell id="cloud1" value="云服务" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="120" height="80" as="geometry"/>
+  <mxGeometry height="80" width="120" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
 ### 人物图标
 ```xml
 <mxCell id="actor1" value="用户" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="30" height="60" as="geometry"/>
+  <mxGeometry height="60" width="30" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
@@ -205,14 +207,14 @@ SYSTEM_PROMPT = """# 角色设定
 ### 泳道
 ```xml
 <mxCell id="swimlane1" value="部门A" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-  <mxGeometry x="50" y="50" width="300" height="200" as="geometry"/>
+  <mxGeometry height="200" width="300" x="50" y="50" as="geometry"/>
 </mxCell>
 ```
 
 ### 分组框
 ```xml
 <mxCell id="group1" value="模块名称" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-  <mxGeometry x="100" y="100" width="200" height="150" as="geometry"/>
+  <mxGeometry height="150" width="200" x="100" y="100" as="geometry"/>
 </mxCell>
 ```
 
@@ -261,6 +263,58 @@ SYSTEM_PROMPT = """# 角色设定
 4. **布局美观**：合理安排元素位置，避免重叠
 5. **中文友好**：节点文本使用清晰的中文
 6. **回复自然**：reply 字段要用自然、友好的语言
+
+## ⚠️ XML 格式严格要求（必须遵守）
+
+1. **禁止在 XML 中使用注释**：不要使用 `<!-- -->` 格式的注释，这会导致解析错误
+2. **特殊字符必须转义**：
+   - 双引号 `"` → 不要在 value 属性中使用，如需引号用中文引号「」或英文单引号 '
+   - 小于号 `<` → `&lt;`
+   - 大于号 `>` → `&gt;`
+   - 和号 `&` → `&amp;`
+3. **value 属性中换行**：使用 `&#xa;` 表示换行，不要用实际换行符
+4. **保持 XML 紧凑**：不要在 mxCell 标签之间添加额外的空行或注释
+
+### 正确示例
+```xml
+<mxCell id="node1" value="第一行&#xa;第二行" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+  <mxGeometry height="60" width="120" x="100" y="100" as="geometry"/>
+</mxCell>
+```
+
+### 错误示例（不要这样做）
+```xml
+<!-- 这是注释，禁止使用！ -->
+<mxCell id="node1" value="包含"引号"会出错" .../>
+```
+
+## ⚠️ JSON 转义规则（edit 操作必须遵守）
+
+当返回 `edit` 操作时，`new_xml` 字段是一个 **JSON 字符串**，XML 中的双引号必须转义为 `\"`。
+
+### 正确的 edit 响应示例
+```json
+{
+  "action": "edit",
+  "operations": [
+    {
+      "type": "add",
+      "cell_id": "node1",
+      "new_xml": "<mxCell id=\"node1\" value=\"文本\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;\" vertex=\"1\" parent=\"1\"><mxGeometry height=\"60\" width=\"120\" x=\"100\" y=\"100\" as=\"geometry\"/></mxCell>"
+    }
+  ],
+  "reply": "已添加节点"
+}
+```
+
+### 错误示例（会导致 JSON 解析失败）
+```json
+{
+  "new_xml": "<mxCell id="node1" ...>"  // 双引号未转义，JSON 无效！
+}
+```
+
+**关键点**：`new_xml` 中每个 `"` 必须写成 `\"`，否则整个 JSON 会解析失败。
 
 现在，请根据用户的消息，返回合适的 JSON 响应。
 """
@@ -340,29 +394,116 @@ class GLMService:
         
         return messages
     
+    def _validate_xml(self, xml: str) -> tuple[bool, str]:
+        """
+        验证 XML 格式是否正确
+        
+        Returns:
+            (is_valid, error_message)
+        """
+        import xml.etree.ElementTree as ET
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            ET.fromstring(xml)
+            return True, ""
+        except ET.ParseError as e:
+            logger.warning(f"[XML验证] XML 解析失败: {e}")
+            return False, str(e)
+    
+    def _fix_xml(self, xml: str) -> str:
+        """尝试修复常见的 XML 问题"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        fixed = xml.strip()
+        
+        # 确保以 <mxGraphModel 开头
+        if not fixed.startswith('<mxGraphModel'):
+            match = re.search(r'<mxGraphModel[\s\S]*</mxGraphModel>', fixed)
+            if match:
+                fixed = match.group()
+                logger.info("[XML修复] 提取了 mxGraphModel 内容")
+        
+        # 确保有 </root> 闭合标签
+        if '<root>' in fixed and '</root>' not in fixed:
+            fixed = fixed.replace('</mxGraphModel>', '</root></mxGraphModel>')
+            logger.info("[XML修复] 添加了 </root> 闭合标签")
+        
+        # 确保有 </mxGraphModel> 闭合标签
+        if '<mxGraphModel' in fixed and '</mxGraphModel>' not in fixed:
+            fixed = fixed + '</mxGraphModel>'
+            logger.info("[XML修复] 添加了 </mxGraphModel> 闭合标签")
+        
+        return fixed
+
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """解析 GLM 响应，提取 JSON 结构"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        result = None
+        
         # 尝试直接解析
         try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            pass
+            result = json.loads(response_text)
+            logger.info(f"[_parse_response] 直接解析成功，action={result.get('action')}")
+        except json.JSONDecodeError as e:
+            logger.warning(f"[_parse_response] 直接解析失败: {e}")
         
         # 尝试从 markdown 代码块中提取
-        json_pattern = r'```(?:json)?\s*([\s\S]*?)```'
-        matches = re.findall(json_pattern, response_text)
+        if result is None:
+            json_pattern = r'```(?:json)?\s*([\s\S]*?)```'
+            matches = re.findall(json_pattern, response_text)
+            
+            for i, match in enumerate(matches):
+                try:
+                    result = json.loads(match.strip())
+                    logger.info(f"[_parse_response] 从代码块 {i} 解析成功，action={result.get('action')}")
+                    break
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[_parse_response] 代码块 {i} 解析失败: {e}")
+                    continue
         
-        for match in matches:
-            try:
-                return json.loads(match.strip())
-            except json.JSONDecodeError:
-                continue
+        # 尝试提取 JSON 对象（处理前后有杂文的情况）
+        if result is None:
+            json_obj_pattern = r'\{[\s\S]*"action"[\s\S]*\}'
+            obj_match = re.search(json_obj_pattern, response_text)
+            if obj_match:
+                try:
+                    result = json.loads(obj_match.group())
+                    logger.info(f"[_parse_response] 从正则提取解析成功，action={result.get('action')}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[_parse_response] 正则提取解析失败: {e}")
         
-        # 如果无法解析，返回纯文本响应
-        return {
-            "action": "none",
-            "reply": response_text
-        }
+        # 如果无法解析，记录原始响应并返回纯文本响应
+        if result is None:
+            logger.error(f"[_parse_response] 所有解析方式均失败，原始响应前500字符: {response_text[:500]}")
+            return {
+                "action": "none",
+                "reply": response_text
+            }
+        
+        # 验证 XML 格式（如果有）
+        if result.get("action") == "display" and result.get("xml"):
+            xml = result["xml"]
+            is_valid, error_msg = self._validate_xml(xml)
+            
+            if not is_valid:
+                logger.warning(f"[_parse_response] XML 格式无效: {error_msg}")
+                # 尝试修复
+                fixed_xml = self._fix_xml(xml)
+                is_valid_fixed, _ = self._validate_xml(fixed_xml)
+                
+                if is_valid_fixed:
+                    logger.info("[_parse_response] XML 修复成功")
+                    result["xml"] = fixed_xml
+                else:
+                    logger.error(f"[_parse_response] XML 修复失败，原始 XML 前200字符: {xml[:200]}")
+                    logger.error(f"[_parse_response] XML 后200字符: {xml[-200:]}")
+        
+        return result
     
     async def chat(
         self,
@@ -484,19 +625,19 @@ class GLMService:
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
     <mxCell id="start" value="开始" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-      <mxGeometry x="340" y="40" width="80" height="40" as="geometry"/>
+      <mxGeometry height="40" width="80" x="340" y="40" as="geometry"/>
     </mxCell>
     <mxCell id="step1" value="步骤 1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-      <mxGeometry x="320" y="120" width="120" height="60" as="geometry"/>
+      <mxGeometry height="60" width="120" x="320" y="120" as="geometry"/>
     </mxCell>
     <mxCell id="decision1" value="条件判断?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-      <mxGeometry x="330" y="220" width="100" height="80" as="geometry"/>
+      <mxGeometry height="80" width="100" x="330" y="220" as="geometry"/>
     </mxCell>
     <mxCell id="step2" value="步骤 2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-      <mxGeometry x="320" y="340" width="120" height="60" as="geometry"/>
+      <mxGeometry height="60" width="120" x="320" y="340" as="geometry"/>
     </mxCell>
     <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
-      <mxGeometry x="340" y="440" width="80" height="40" as="geometry"/>
+      <mxGeometry height="40" width="80" x="340" y="440" as="geometry"/>
     </mxCell>
     <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;" edge="1" parent="1" source="start" target="step1">
       <mxGeometry relative="1" as="geometry"/>
@@ -524,22 +665,22 @@ class GLMService:
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
     <mxCell id="client" value="客户端" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-      <mxGeometry x="320" y="40" width="120" height="60" as="geometry"/>
+      <mxGeometry height="60" width="120" x="320" y="40" as="geometry"/>
     </mxCell>
     <mxCell id="gateway" value="API 网关" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-      <mxGeometry x="320" y="140" width="120" height="60" as="geometry"/>
+      <mxGeometry height="60" width="120" x="320" y="140" as="geometry"/>
     </mxCell>
     <mxCell id="service1" value="服务 A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-      <mxGeometry x="180" y="260" width="100" height="60" as="geometry"/>
+      <mxGeometry height="60" width="100" x="180" y="260" as="geometry"/>
     </mxCell>
     <mxCell id="service2" value="服务 B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-      <mxGeometry x="330" y="260" width="100" height="60" as="geometry"/>
+      <mxGeometry height="60" width="100" x="330" y="260" as="geometry"/>
     </mxCell>
     <mxCell id="service3" value="服务 C" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-      <mxGeometry x="480" y="260" width="100" height="60" as="geometry"/>
+      <mxGeometry height="60" width="100" x="480" y="260" as="geometry"/>
     </mxCell>
     <mxCell id="db" value="数据库" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
-      <mxGeometry x="340" y="380" width="80" height="100" as="geometry"/>
+      <mxGeometry height="100" width="80" x="340" y="380" as="geometry"/>
     </mxCell>
     <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;" edge="1" parent="1" source="client" target="gateway">
       <mxGeometry relative="1" as="geometry"/>
@@ -570,19 +711,19 @@ class GLMService:
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
     <mxCell id="center" value="中心主题" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=14;" vertex="1" parent="1">
-      <mxGeometry x="330" y="200" width="100" height="60" as="geometry"/>
+      <mxGeometry height="60" width="100" x="330" y="200" as="geometry"/>
     </mxCell>
     <mxCell id="branch1" value="分支 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-      <mxGeometry x="140" y="100" width="100" height="40" as="geometry"/>
+      <mxGeometry height="40" width="100" x="140" y="100" as="geometry"/>
     </mxCell>
     <mxCell id="branch2" value="分支 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-      <mxGeometry x="520" y="100" width="100" height="40" as="geometry"/>
+      <mxGeometry height="40" width="100" x="520" y="100" as="geometry"/>
     </mxCell>
     <mxCell id="branch3" value="分支 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-      <mxGeometry x="140" y="320" width="100" height="40" as="geometry"/>
+      <mxGeometry height="40" width="100" x="140" y="320" as="geometry"/>
     </mxCell>
     <mxCell id="branch4" value="分支 4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
-      <mxGeometry x="520" y="320" width="100" height="40" as="geometry"/>
+      <mxGeometry height="40" width="100" x="520" y="320" as="geometry"/>
     </mxCell>
     <mxCell id="l1" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;curved=1;" edge="1" parent="1" source="center" target="branch1">
       <mxGeometry relative="1" as="geometry"/>

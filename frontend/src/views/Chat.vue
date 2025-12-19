@@ -48,7 +48,7 @@
       <!-- 消息列表 -->
       <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
         <!-- 欢迎消息 -->
-        <div v-if="messages.length === 0" class="text-center py-12">
+        <div v-if="messages.length === 0 && !streamingMessage" class="text-center py-12">
           <div class="w-16 h-16 mx-auto mb-4 bg-primary-100 rounded-full flex items-center justify-center">
             <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -75,7 +75,8 @@
                 : 'bg-white text-gray-800 shadow-sm rounded-bl-md'
             ]"
           >
-            <p class="whitespace-pre-wrap">{{ msg.content }}</p>
+            <!-- 渲染消息内容 -->
+            <MessageContent :content="msg.content" :isUser="msg.role === 'user'" />
             <p 
               v-if="msg.diagram_updated" 
               class="mt-2 text-xs opacity-70 flex items-center gap-1"
@@ -88,8 +89,27 @@
           </div>
         </div>
 
-        <!-- 加载中 -->
-        <div v-if="loading" class="flex justify-start">
+        <!-- 流式响应中的消息 -->
+        <div v-if="isStreaming" class="flex justify-start">
+          <div class="max-w-[80%] px-4 py-3 rounded-2xl bg-white text-gray-800 shadow-sm rounded-bl-md">
+            <!-- 灰色小字显示原始输出 -->
+            <div v-if="streamingRaw" class="text-xs text-gray-400 mb-2 font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
+              {{ streamingRaw }}
+            </div>
+            <!-- 分隔线 -->
+            <div v-if="streamingRaw && streamingMessage" class="border-t border-gray-100 my-2"></div>
+            <!-- 解析后的内容 -->
+            <MessageContent v-if="streamingMessage" :content="streamingMessage" :isUser="false" />
+            <!-- 正在输入指示器 -->
+            <div class="flex items-center gap-1 mt-2">
+              <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-pulse"></div>
+              <span class="text-xs text-gray-400">AI 正在生成...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 加载中（非流式时显示） -->
+        <div v-if="loading && !isStreaming" class="flex justify-start">
           <div class="bg-white px-4 py-3 rounded-2xl rounded-bl-md shadow-sm">
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
@@ -126,9 +146,61 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, h, defineComponent } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
+
+// 消息内容渲染组件
+const MessageContent = defineComponent({
+  props: {
+    content: { type: String, required: true },
+    isUser: { type: Boolean, default: false }
+  },
+  setup(props) {
+    return () => {
+      if (props.isUser) {
+        // 用户消息：纯文本
+        return h('p', { class: 'whitespace-pre-wrap' }, props.content)
+      }
+      
+      // AI 消息：解析代码块
+      const parts = []
+      const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g
+      let lastIndex = 0
+      let match
+      
+      while ((match = codeBlockRegex.exec(props.content)) !== null) {
+        // 代码块之前的文本
+        if (match.index > lastIndex) {
+          const text = props.content.slice(lastIndex, match.index)
+          parts.push(h('p', { class: 'whitespace-pre-wrap mb-2' }, text))
+        }
+        
+        // 代码块
+        const lang = match[1] || 'text'
+        const code = match[2].trim()
+        parts.push(
+          h('div', { class: 'my-2' }, [
+            h('div', { class: 'bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-t-lg' }, lang.toUpperCase() || 'CODE'),
+            h('pre', { class: 'bg-gray-800 text-gray-100 p-3 rounded-b-lg overflow-x-auto text-sm' }, [
+              h('code', {}, code)
+            ])
+          ])
+        )
+        
+        lastIndex = match.index + match[0].length
+      }
+      
+      // 剩余文本
+      if (lastIndex < props.content.length) {
+        const text = props.content.slice(lastIndex)
+        parts.push(h('p', { class: 'whitespace-pre-wrap' }, text))
+      }
+      
+      return h('div', {}, parts.length > 0 ? parts : props.content)
+    }
+  }
+})
 
 const props = defineProps({
   sessionId: {
@@ -146,7 +218,12 @@ const loading = ref(false)
 const downloading = ref(false)
 const messages = ref([])
 
-// 发送消息
+// 流式响应状态
+const streamingMessage = ref('')  // 解析后的回复内容
+const streamingRaw = ref('')      // 原始输出内容（灰色小字显示）
+const isStreaming = ref(false)    // 是否正在接收流式响应
+
+// 发送消息（使用流式响应）
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || loading.value) return
 
@@ -161,16 +238,63 @@ const sendMessage = async () => {
 
   await scrollToBottom()
   loading.value = true
+  streamingMessage.value = ''
+  streamingRaw.value = ''
+  isStreaming.value = false
+
+  let finalResult = null
 
   try {
-    const response = await chatStore.sendMessage(props.sessionId, userMessage, messages.value)
-    
-    // 添加助手回复
-    messages.value.push({
-      role: 'assistant',
-      content: response.reply,
-      diagram_updated: response.diagram_updated
-    })
+    await chatStore.sendMessageStream(
+      props.sessionId,
+      userMessage,
+      messages.value,
+      (chunk) => {
+        // 处理流式数据
+        if (chunk.type === 'text') {
+          // 开始接收流式数据
+          isStreaming.value = true
+          // 累积原始输出
+          streamingRaw.value += chunk.content
+          // 尝试从原始内容中提取 reply
+          const replyMatch = streamingRaw.value.match(/"reply"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/s)
+          if (replyMatch) {
+            try {
+              streamingMessage.value = JSON.parse(`"${replyMatch[1]}"`)
+            } catch (e) {
+              // 解析失败，使用原始匹配
+              streamingMessage.value = replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+            }
+          }
+          scrollToBottom()
+        } else if (chunk.type === 'complete') {
+          // 完整结果
+          finalResult = chunk.result
+        } else if (chunk.type === 'diagram_status') {
+          // 图表更新状态
+          if (finalResult) {
+            finalResult.diagram_updated = chunk.updated
+          }
+        } else if (chunk.type === 'error') {
+          streamingMessage.value = `错误: ${chunk.message}`
+        }
+      }
+    )
+
+    // 添加最终的助手回复
+    if (finalResult) {
+      messages.value.push({
+        role: 'assistant',
+        content: finalResult.reply || streamingMessage.value,
+        diagram_updated: finalResult.diagram_updated || false
+      })
+    } else if (streamingMessage.value) {
+      // 如果没有 finalResult，使用流式累积的内容
+      messages.value.push({
+        role: 'assistant',
+        content: streamingMessage.value
+      })
+    }
   } catch (error) {
     messages.value.push({
       role: 'assistant',
@@ -178,6 +302,9 @@ const sendMessage = async () => {
     })
   } finally {
     loading.value = false
+    streamingMessage.value = ''
+    streamingRaw.value = ''
+    isStreaming.value = false
     await scrollToBottom()
   }
 }

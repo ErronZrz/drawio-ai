@@ -11,6 +11,8 @@ import os
 import json
 import asyncio
 import logging
+import re
+import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional
 from contextlib import AsyncExitStack
 
@@ -103,7 +105,7 @@ class DrawioMCPClient:
         """
         session = await self._ensure_connected()
         
-        logger.debug(f"调用工具: {tool_name}, 参数: {json.dumps(arguments, ensure_ascii=False)[:200]}")
+        logger.info(f"调用工具: {tool_name}, 参数长度: {len(json.dumps(arguments, ensure_ascii=False))}")
         
         try:
             result = await session.call_tool(tool_name, arguments)
@@ -180,6 +182,72 @@ class DrawioMCPClient:
             "message": "会话已创建"
         }
     
+    def _validate_and_fix_xml(self, xml: str) -> tuple[bool, str, str]:
+        """
+        验证并尝试修复 XML
+        
+        Args:
+            xml: 原始 XML 字符串
+            
+        Returns:
+            (is_valid, fixed_xml, error_message)
+        """
+        # 先尝试直接解析
+        try:
+            ET.fromstring(xml)
+            return True, xml, ""
+        except ET.ParseError as e:
+            logger.warning(f"[XML验证] 原始 XML 解析失败: {e}")
+        
+        fixed_xml = xml
+        
+        # 修复1: 移除 XML 前后的空白和杂字符
+        fixed_xml = fixed_xml.strip()
+        
+        # 修复2: 确保以 <mxGraphModel 开头
+        if not fixed_xml.startswith('<mxGraphModel'):
+            match = re.search(r'<mxGraphModel[\s\S]*</mxGraphModel>', fixed_xml)
+            if match:
+                fixed_xml = match.group()
+                logger.info("[XML修复] 提取了 mxGraphModel 内容")
+        
+        # 修复3: 确保 </mxGraphModel> 闭合标签存在
+        if '<mxGraphModel' in fixed_xml and '</mxGraphModel>' not in fixed_xml:
+            fixed_xml = fixed_xml + '</mxGraphModel>'
+            logger.info("[XML修复] 添加了 </mxGraphModel> 闭合标签")
+        
+        # 修复4: 确保 </root> 闭合标签存在
+        if '<root>' in fixed_xml and '</root>' not in fixed_xml:
+            # 在 </mxGraphModel> 前插入 </root>
+            fixed_xml = fixed_xml.replace('</mxGraphModel>', '</root></mxGraphModel>')
+            logger.info("[XML修复] 添加了 </root> 闭合标签")
+        
+        # 修复5: 修复未闭合的 mxCell 标签（自闭合）
+        # 查找 <mxCell ...> 后面没有 </mxCell> 或 /> 的情况
+        def fix_unclosed_mxcell(match):
+            content = match.group(0)
+            # 如果已经是自闭合或有闭合标签，保持不变
+            if content.rstrip().endswith('/>') or '</mxCell>' in content:
+                return content
+            # 检查是否包含 mxGeometry 子元素
+            if '<mxGeometry' in content:
+                # 确保 mxGeometry 是自闭合的
+                content = re.sub(r'<mxGeometry([^>]*)>\s*</mxGeometry>', r'<mxGeometry\1/>', content)
+                content = re.sub(r'<mxGeometry([^/])>(?!</mxGeometry>)', r'<mxGeometry\1/>', content)
+            return content
+        
+        # 再次尝试解析
+        try:
+            ET.fromstring(fixed_xml)
+            logger.info("[XML修复] 修复成功")
+            return True, fixed_xml, ""
+        except ET.ParseError as e:
+            error_msg = str(e)
+            logger.error(f"[XML验证] 修复后仍然失败: {error_msg}")
+            logger.error(f"[XML验证] XML 前200字符: {fixed_xml[:200]}")
+            logger.error(f"[XML验证] XML 后200字符: {fixed_xml[-200:]}")
+            return False, fixed_xml, error_msg
+
     async def display_diagram(self, session_id: str, xml: str) -> bool:
         """
         显示/替换整个图表
@@ -194,9 +262,23 @@ class DrawioMCPClient:
             是否成功
         """
         try:
+            logger.info(f"[display_diagram] 开始调用，session_id={session_id}, XML长度={len(xml)}")
+            
+            # 验证并尝试修复 XML
+            is_valid, fixed_xml, error_msg = self._validate_and_fix_xml(xml)
+            if not is_valid:
+                logger.error(f"[display_diagram] XML 验证失败: {error_msg}")
+                # 尝试继续发送，让 MCP Server 处理
+                logger.warning("[display_diagram] 尝试发送可能有问题的 XML...")
+            elif fixed_xml != xml:
+                logger.info(f"[display_diagram] XML 已修复，新长度: {len(fixed_xml)}")
+                xml = fixed_xml
+            
             result = await self._call_tool("display_diagram", {
                 "xml": xml
             })
+            
+            logger.info(f"[display_diagram] MCP 返回结果: {result}")
             
             # 更新本地缓存
             if session_id in self.sessions:
@@ -206,7 +288,7 @@ class DrawioMCPClient:
             return True
             
         except Exception as e:
-            logger.error(f"显示图表失败: {e}")
+            logger.error(f"显示图表失败: {e}", exc_info=True)
             return False
     
     async def edit_diagram(self, session_id: str, operations: List[Dict[str, Any]]) -> bool:

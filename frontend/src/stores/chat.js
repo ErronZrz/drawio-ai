@@ -24,6 +24,21 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    // 流式发送消息
+    async sendMessageStream(sessionId, message, history = [], onChunk) {
+      this.loading = true
+      try {
+        const chatHistory = history.slice(-10).map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+
+        await api.chatStream(sessionId, message, chatHistory, onChunk)
+      } finally {
+        this.loading = false
+      }
+    },
+
     async downloadDiagram(sessionId) {
       const blob = await api.downloadDiagram(sessionId)
       

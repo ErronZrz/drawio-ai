@@ -6,10 +6,13 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
+import logging
 
 from app.services.glm_service import GLMService
 from app.services.session_manager import SessionManager
 from app.services.mcp_client import get_mcp_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 glm_service = GLMService()
@@ -63,14 +66,28 @@ async def chat_with_glm(session_id: str, request: ChatRequest):
         diagram_updated = False
         action = result.get("action", "none")
         
+        logger.info(f"GLM 返回 action: {action}")
+        
         if action == "display" and result.get("xml"):
             # 显示新图表
-            await mcp_client.display_diagram(session_id, result["xml"])
-            diagram_updated = True
+            xml = result["xml"]
+            logger.info(f"准备显示图表，XML 长度: {len(xml)}")
+            success = await mcp_client.display_diagram(session_id, xml)
+            if success:
+                diagram_updated = True
+                logger.info(f"图表显示成功")
+            else:
+                logger.error(f"图表显示失败，MCP display_diagram 返回 False")
         elif action == "edit" and result.get("operations"):
             # 编辑现有图表
-            await mcp_client.edit_diagram(session_id, result["operations"])
-            diagram_updated = True
+            operations = result["operations"]
+            logger.info(f"准备编辑图表，操作数: {len(operations)}")
+            success = await mcp_client.edit_diagram(session_id, operations)
+            if success:
+                diagram_updated = True
+                logger.info(f"图表编辑成功")
+            else:
+                logger.error(f"图表编辑失败，MCP edit_diagram 返回 False")
         
         return ChatResponse(
             reply=result.get("reply", ""),
@@ -96,13 +113,54 @@ async def chat_with_glm_stream(session_id: str, request: ChatRequest):
         try:
             mcp_client = get_mcp_client()
             current_xml = await mcp_client.get_diagram(session_id)
+            final_result = None
+            
             async for chunk in glm_service.chat_stream(
                 user_message=request.message,
                 history=request.history,
                 current_diagram_xml=current_xml
             ):
                 yield f"data: {chunk}\n\n"
+                
+                # 解析 chunk，获取最终结果
+                try:
+                    import json
+                    chunk_data = json.loads(chunk)
+                    if chunk_data.get("type") == "complete":
+                        final_result = chunk_data.get("result")
+                except:
+                    pass
+            
+            # 流式结束后，执行图表操作
+            if final_result:
+                action = final_result.get("action", "none")
+                diagram_updated = False
+                
+                if action == "display" and final_result.get("xml"):
+                    xml = final_result["xml"]
+                    logger.info(f"[stream] 准备显示图表，XML 长度: {len(xml)}")
+                    success = await mcp_client.display_diagram(session_id, xml)
+                    if success:
+                        diagram_updated = True
+                        logger.info("[stream] 图表显示成功")
+                    else:
+                        logger.error("[stream] 图表显示失败")
+                        
+                elif action == "edit" and final_result.get("operations"):
+                    operations = final_result["operations"]
+                    logger.info(f"[stream] 准备编辑图表，操作数: {len(operations)}")
+                    success = await mcp_client.edit_diagram(session_id, operations)
+                    if success:
+                        diagram_updated = True
+                        logger.info("[stream] 图表编辑成功")
+                    else:
+                        logger.error("[stream] 图表编辑失败")
+                
+                # 发送图表更新状态
+                yield f"data: {{\"type\": \"diagram_status\", \"updated\": {str(diagram_updated).lower()}}}\n\n"
+                
         except Exception as e:
-            yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
+            logger.error(f"[stream] 错误: {str(e)}")
+            yield f"data: {{\"type\": \"error\", \"message\": \"{str(e)}\"}}\n\n"
     
     return StreamingResponse(generate(), media_type="text/event-stream")

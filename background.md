@@ -1,5 +1,18 @@
 ## drawio MCP Server 能力概述
 
+MCP Server 基础信息：
+
+```json
+{
+  "mcpServers": {
+    "drawio": {
+      "command": "npx",
+      "args": ["@next-ai-drawio/mcp-server@latest"]
+    }
+  }
+}
+```
+
 根据已连接的 MCP 服务信息，**drawio MCP Server** 提供了以下 **5 个核心功能**：
 
 | 工具名称 | 功能说明 |
