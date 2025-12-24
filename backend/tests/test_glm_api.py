@@ -32,7 +32,7 @@ GLM_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4"
 def test_glm_connection():
     """测试 GLM API 连接（使用 OpenAI 兼容格式）"""
     api_key = os.getenv("GLM_API_KEY", "")
-    model = os.getenv("GLM_MODEL", "GLM-4.6")
+    model = os.getenv("GLM_MODEL", "GLM-4.7")
     
     print("=" * 50)
     print("GLM API 连接测试 (OpenAI 兼容模式)")
@@ -147,7 +147,7 @@ def test_glm_connection():
 def test_simple_diagram_generation():
     """测试简单的图表生成"""
     api_key = os.getenv("GLM_API_KEY", "")
-    model = os.getenv("GLM_MODEL", "GLM-4.6")
+    model = os.getenv("GLM_MODEL", "GLM-4.7")
     
     if not api_key or api_key == "your_glm_api_key_here":
         print("跳过图表生成测试 (API Key 未配置)")

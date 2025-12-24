@@ -329,8 +329,10 @@ class GLMService:
     
     def __init__(self):
         self.api_key = os.getenv("GLM_API_KEY", "")
-        self.model = os.getenv("GLM_MODEL", "GLM-4.6")
+        self.model = os.getenv("GLM_MODEL", "GLM-4.7")
         self.base_url = os.getenv("GLM_BASE_URL", GLM_BASE_URL)
+        self.temperature = float(os.getenv("GLM_TEMPERATURE", "0.7"))
+        self.max_tokens = int(os.getenv("GLM_MAX_TOKENS", "8192"))
         self.client = None
         self._init_client()
     
@@ -438,6 +440,92 @@ class GLMService:
         
         return fixed
 
+    def _try_fix_truncated_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        尝试修复被截断的 JSON 响应
+        
+        当 GLM 返回的内容因 token 限制被截断时，JSON 字符串可能不完整。
+        这个方法尝试修复常见的截断情况。
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 检测是否是被截断的 display action
+        if '"action"' in text and '"display"' in text and '"xml"' in text:
+            logger.info("[_try_fix_truncated_json] 检测到可能被截断的 display 响应")
+            
+            # 尝试提取 action
+            action_match = re.search(r'"action"\s*:\s*"(\w+)"', text)
+            action = action_match.group(1) if action_match else "display"
+            
+            # 尝试提取 reply
+            reply_match = re.search(r'"reply"\s*:\s*"([^"]*(?:\\"[^"]*)*)"', text)
+            reply = reply_match.group(1).replace('\\"', '"') if reply_match else ""
+            
+            # 尝试提取 xml 内容（可能被截断）
+            xml_match = re.search(r'"xml"\s*:\s*"(.*)', text, re.DOTALL)
+            if xml_match:
+                xml_content = xml_match.group(1)
+                # 移除尾部不完整的部分（引号、逗号、大括号等）
+                # 尝试找到 XML 的结束位置
+                
+                # 方法1：如果能找到完整的 mxGraphModel 闭合标签
+                end_tag_pos = xml_content.rfind('</mxGraphModel>')
+                if end_tag_pos != -1:
+                    xml_content = xml_content[:end_tag_pos + len('</mxGraphModel>')]
+                else:
+                    # 方法2：如果找到 </root> 但没有 </mxGraphModel>
+                    root_end_pos = xml_content.rfind('</root>')
+                    if root_end_pos != -1:
+                        xml_content = xml_content[:root_end_pos + len('</root>')] + '</mxGraphModel>'
+                    else:
+                        # 方法3：尝试找到最后一个完整的 mxCell 并补全
+                        last_cell_end = xml_content.rfind('</mxCell>')
+                        if last_cell_end != -1:
+                            xml_content = xml_content[:last_cell_end + len('</mxCell>')] + '</root></mxGraphModel>'
+                        else:
+                            # 方法4：找到最后一个完整的 mxGeometry 标签
+                            last_geo_end = xml_content.rfind('/>')
+                            if last_geo_end != -1:
+                                # 回退找到 <mxCell 开始
+                                xml_content = xml_content[:last_geo_end + 2] + '</mxCell></root></mxGraphModel>'
+                            else:
+                                logger.warning("[_try_fix_truncated_json] 无法找到可修复的 XML 结构")
+                                return None
+                
+                # 反转义 JSON 字符串中的特殊字符
+                xml_content = xml_content.replace('\\"', '"')
+                xml_content = xml_content.replace('\\n', '\n')
+                xml_content = xml_content.replace('\\t', '\t')
+                
+                # 验证修复后的 XML
+                is_valid, error = self._validate_xml(xml_content)
+                if is_valid:
+                    logger.info("[_try_fix_truncated_json] XML 修复成功")
+                    return {
+                        "action": action,
+                        "xml": xml_content,
+                        "reply": reply if reply else "图表已生成，但由于响应较长，部分内容可能被截断。如有问题请告诉我。"
+                    }
+                else:
+                    # 尝试进一步修复
+                    fixed_xml = self._fix_xml(xml_content)
+                    is_valid, _ = self._validate_xml(fixed_xml)
+                    if is_valid:
+                        logger.info("[_try_fix_truncated_json] XML 二次修复成功")
+                        return {
+                            "action": action,
+                            "xml": fixed_xml,
+                            "reply": reply if reply else "图表已生成，但由于响应较长，部分内容可能被截断。如有问题请告诉我。"
+                        }
+                    logger.warning(f"[_try_fix_truncated_json] XML 验证失败: {error}")
+        
+        # 检测是否是被截断的 edit action
+        if '"action"' in text and '"edit"' in text and '"operations"' in text:
+            logger.warning("[_try_fix_truncated_json] 检测到被截断的 edit 响应，暂不支持自动修复")
+        
+        return None
+
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """解析 GLM 响应，提取 JSON 结构"""
         import logging
@@ -477,12 +565,25 @@ class GLMService:
                 except json.JSONDecodeError as e:
                     logger.warning(f"[_parse_response] 正则提取解析失败: {e}")
         
-        # 如果无法解析，记录原始响应并返回纯文本响应
+        # 尝试修复被截断的 JSON 响应
         if result is None:
-            logger.error(f"[_parse_response] 所有解析方式均失败，原始响应前500字符: {response_text[:500]}")
+            logger.info("[_parse_response] 尝试修复被截断的 JSON 响应")
+            result = self._try_fix_truncated_json(response_text)
+        
+        # 如果无法解析，将原始响应作为纯文本回复返回
+        if result is None:
+            logger.warning(f"[_parse_response] 所有 JSON 解析方式均失败，将原始响应作为纯文本回复")
+            # 清理响应文本：去除可能的代码块标记等
+            cleaned_text = response_text.strip()
+            # 如果响应被 markdown 代码块包裹但不是 JSON，尝试提取内容
+            if cleaned_text.startswith('```') and cleaned_text.endswith('```'):
+                lines = cleaned_text.split('\n')
+                if len(lines) > 2:
+                    # 去掉首尾的 ``` 行
+                    cleaned_text = '\n'.join(lines[1:-1]).strip()
             return {
                 "action": "none",
-                "reply": response_text
+                "reply": cleaned_text if cleaned_text else "收到您的消息，但无法正确解析响应内容。"
             }
         
         # 验证 XML 格式（如果有）
@@ -537,8 +638,8 @@ class GLMService:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=4096
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
             )
             
             response_text = response.choices[0].message.content
@@ -572,8 +673,8 @@ class GLMService:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=4096,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
                 stream=True
             )
             

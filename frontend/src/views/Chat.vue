@@ -146,9 +146,16 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, h, defineComponent } from 'vue'
+import { ref, nextTick, onMounted, h, defineComponent, computed } from 'vue'
+import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
+
+// 配置 marked 选项
+marked.setOptions({
+  breaks: true,  // 支持 \n 换行
+  gfm: true      // 支持 GitHub 风格的 Markdown
+})
 
 // 消息内容渲染组件
 const MessageContent = defineComponent({
@@ -157,47 +164,27 @@ const MessageContent = defineComponent({
     isUser: { type: Boolean, default: false }
   },
   setup(props) {
+    const renderedContent = computed(() => {
+      if (props.isUser) {
+        return null
+      }
+      // 处理转义的换行符
+      const processedContent = props.content.replace(/\\n/g, '\n')
+      // 使用 marked 解析 Markdown
+      return marked.parse(processedContent)
+    })
+
     return () => {
       if (props.isUser) {
         // 用户消息：纯文本
         return h('p', { class: 'whitespace-pre-wrap' }, props.content)
       }
       
-      // AI 消息：解析代码块
-      const parts = []
-      const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g
-      let lastIndex = 0
-      let match
-      
-      while ((match = codeBlockRegex.exec(props.content)) !== null) {
-        // 代码块之前的文本
-        if (match.index > lastIndex) {
-          const text = props.content.slice(lastIndex, match.index)
-          parts.push(h('p', { class: 'whitespace-pre-wrap mb-2' }, text))
-        }
-        
-        // 代码块
-        const lang = match[1] || 'text'
-        const code = match[2].trim()
-        parts.push(
-          h('div', { class: 'my-2' }, [
-            h('div', { class: 'bg-gray-700 text-gray-300 text-xs px-3 py-1 rounded-t-lg' }, lang.toUpperCase() || 'CODE'),
-            h('pre', { class: 'bg-gray-800 text-gray-100 p-3 rounded-b-lg overflow-x-auto text-sm' }, [
-              h('code', {}, code)
-            ])
-          ])
-        )
-        
-        lastIndex = match.index + match[0].length
-      }
-      
-      // 剩余文本
-      if (lastIndex < props.content.length) {
-        const text = props.content.slice(lastIndex)
-        parts.push(h('p', { class: 'whitespace-pre-wrap' }, text))
-      }
-      
-      return h('div', {}, parts.length > 0 ? parts : props.content)
+      // AI 消息：使用 Markdown 渲染
+      return h('div', {
+        class: 'prose prose-sm max-w-none prose-headings:text-gray-800 prose-p:text-gray-700 prose-strong:text-gray-800 prose-code:text-primary-600 prose-code:bg-primary-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700',
+        innerHTML: renderedContent.value
+      })
     }
   }
 })
@@ -256,7 +243,7 @@ const sendMessage = async () => {
           isStreaming.value = true
           // 累积原始输出
           streamingRaw.value += chunk.content
-          // 尝试从原始内容中提取 reply
+          // 尝试从原始内容中提取 reply（适用于 JSON 格式响应）
           const replyMatch = streamingRaw.value.match(/"reply"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/s)
           if (replyMatch) {
             try {
@@ -264,6 +251,13 @@ const sendMessage = async () => {
             } catch (e) {
               // 解析失败，使用原始匹配
               streamingMessage.value = replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+            }
+          } else {
+            // 如果不是 JSON 格式（纯文本回复），直接显示原始内容
+            // 检查是否不是以 { 开头或者不包含 "action" 关键字
+            const trimmedRaw = streamingRaw.value.trim()
+            if (!trimmedRaw.startsWith('{') || !trimmedRaw.includes('"action"')) {
+              streamingMessage.value = trimmedRaw
             }
           }
           scrollToBottom()
@@ -283,9 +277,11 @@ const sendMessage = async () => {
 
     // 添加最终的助手回复
     if (finalResult) {
+      // 优先使用 finalResult.reply，如果为空则使用 streamingMessage，再回退到 streamingRaw
+      const replyContent = finalResult.reply || streamingMessage.value || streamingRaw.value.trim()
       messages.value.push({
         role: 'assistant',
-        content: finalResult.reply || streamingMessage.value,
+        content: replyContent,
         diagram_updated: finalResult.diagram_updated || false
       })
     } else if (streamingMessage.value) {
@@ -293,6 +289,12 @@ const sendMessage = async () => {
       messages.value.push({
         role: 'assistant',
         content: streamingMessage.value
+      })
+    } else if (streamingRaw.value.trim()) {
+      // 最后回退：使用原始输出内容
+      messages.value.push({
+        role: 'assistant',
+        content: streamingRaw.value.trim()
       })
     }
   } catch (error) {
